@@ -6,8 +6,12 @@ on:
 
 jobs:
   unit-tests:
-    name: Unit Tests
+    name: Unit Tests (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20.x, 22.x, 24.x]
 
     steps:
       - name: Checkout
@@ -16,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ matrix.node-version }}
           cache: "npm"
 
       - name: Install dependencies
@@ -26,8 +30,12 @@ jobs:
         run: npm run test:unit
 
   integration-tests:
-    name: Integration Tests
+    name: Integration Tests (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20.x, 22.x, 24.x]
 
     steps:
       - name: Checkout
@@ -36,7 +44,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ matrix.node-version }}
           cache: "npm"
 
       - name: Install dependencies
@@ -46,8 +54,12 @@ jobs:
         run: npm run test:integration
 
   lint:
-    name: Lint & Format
+    name: Lint & Format (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20.x, 22.x, 24.x]
 
     steps:
       - name: Checkout
@@ -56,7 +68,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ matrix.node-version }}
           cache: "npm"
 
       - name: Install dependencies
@@ -69,7 +81,7 @@ jobs:
         run: npm run format:check
 
   security-audit:
-    name: Security Audit
+    name: Security Audit (Node 24.x)
     runs-on: ubuntu-latest
 
     steps:
@@ -79,7 +91,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24.x"
           cache: "npm"
 
       - name: Install dependencies

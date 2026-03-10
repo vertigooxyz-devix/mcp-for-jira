@@ -9,7 +9,7 @@ MCP (Model Context Protocol) server for **Jira Cloud** API integration. Create i
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - Jira Cloud site
 - [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens)
 
@@ -176,7 +176,7 @@ To bypass (use sparingly): `git commit --no-verify` or `HUSKY=0 git commit`
 
 ### CI
 
-GitHub Actions runs on **pull requests** to `main`/`master` with separate stages:
+GitHub Actions runs on **pull requests** to `main`/`master` with separate stages. Test and lint jobs run across **Node.js 20.x, 22.x, and 24.x**:
 
 - **Unit Tests** – `npm run test:unit` (90% coverage enforced)
 - **Integration Tests** – `npm run test:integration` (MCP server + mock Jira)
