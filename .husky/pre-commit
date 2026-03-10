@@ -1,0 +1,7 @@
+echo "🔍 Running lint and format checks on staged files..."
+if ! npx lint-staged; then
+  echo ""
+  echo "❌ Commit blocked: Fix the lint or Prettier errors above."
+  echo "   Tips: npm run lint:fix  |  npm run format"
+  exit 1
+fi
