@@ -1,0 +1,2 @@
+export const CHARACTER_LIMIT = 25000;
+export const REQUEST_TIMEOUT_MS = 30000;
