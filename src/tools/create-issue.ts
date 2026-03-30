@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import { z } from "zod";
-import type { CreatedIssue } from "../types.js";
+import { CreatedIssueResponseSchema } from "../schemas/jira-responses.js";
 import { CreateIssueInputSchema, ResponseFormat } from "../schemas/issue.js";
 import { handleJiraError } from "../services/jira-client.js";
 import { fetchIssueTypesForProject } from "../services/jira-api.js";
@@ -146,15 +146,17 @@ export function registerCreateIssueTool(
 
         // Log API call
         await sendLog(extra, "info", "Sending request to Jira API...");
-        const response = await client.post<CreatedIssue>("/issue", {
+        const response = await client.post("/issue", {
           fields,
         });
         await sendLog(extra, "info", `Issue ${response.data.key} created successfully`);
 
-        const result = {
-          key: response.data.key,
-          id: response.data.id,
-          self: response.data.self,
+        const result = CreatedIssueResponseSchema.parse(response.data);
+
+        const issueData = {
+          key: result.key,
+          id: result.id,
+          self: result.self,
         };
 
         let textContent: string;
@@ -162,17 +164,17 @@ export function registerCreateIssueTool(
           textContent = [
             `# Issue Created`,
             "",
-            `**Key:** ${result.key}`,
-            `**ID:** ${result.id}`,
-            `**URL:** ${result.self}`,
+            `**Key:** ${issueData.key}`,
+            `**ID:** ${issueData.id}`,
+            `**URL:** ${issueData.self}`,
           ].join("\n");
         } else {
-          textContent = JSON.stringify(result, null, 2);
+          textContent = JSON.stringify(issueData, null, 2);
         }
 
         return {
           content: [{ type: "text" as const, text: textContent }],
-          structuredContent: result,
+          structuredContent: issueData,
         };
       } catch (error) {
         return {
