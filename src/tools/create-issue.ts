@@ -4,10 +4,7 @@ import type { CreatedIssue } from "../types.js";
 import { CreateIssueInputSchema, ResponseFormat } from "../schemas/issue.js";
 import { handleJiraError } from "../services/jira-client.js";
 import { fetchIssueTypesForProject } from "../services/jira-api.js";
-import type {
-  ServerRequest,
-  ServerNotification,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { ServerRequest, ServerNotification } from "@modelcontextprotocol/sdk/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
