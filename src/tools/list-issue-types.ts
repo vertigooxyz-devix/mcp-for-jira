@@ -3,6 +3,32 @@ import { z } from "zod";
 import { handleJiraError } from "../services/jira-client.js";
 import { fetchIssueTypesForProject } from "../services/jira-api.js";
 import { ListIssueTypesInputSchema, ResponseFormat } from "../schemas/issue.js";
+import type {
+  ServerRequest,
+  ServerNotification,
+} from "@modelcontextprotocol/sdk/types.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+
+type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
+
+/**
+ * Sends a logging message notification to the client.
+ * Silently skips if the client doesn't support logging.
+ */
+async function sendLog(
+  extra: ToolExtra,
+  level: "debug" | "info" | "warning" | "error",
+  message: string
+): Promise<void> {
+  try {
+    await extra.sendNotification({
+      method: "notifications/message",
+      params: { level, data: message },
+    });
+  } catch {
+    // Client may not support logging - silently skip
+  }
+}
 
 const TOOL_DESCRIPTION = `List issue types available for a Jira project.
 
@@ -30,7 +56,7 @@ export function registerListIssueTypesTool(
     registerTool: (
       name: string,
       config: object,
-      handler: (...args: unknown[]) => Promise<object>
+      handler: (args: unknown, extra: ToolExtra) => Promise<object>
     ) => void;
   },
   client: AxiosInstance
@@ -59,11 +85,15 @@ export function registerListIssueTypesTool(
         openWorldHint: true,
       },
     },
-    async (args: unknown) => {
+    async (args: unknown, extra: ToolExtra) => {
       try {
         const { project_key, response_format } = ListIssueTypesInputSchema.parse(args);
 
+        // Log start of operation
+        await sendLog(extra, "info", `Fetching issue types for project ${project_key}...`);
+
         const issueTypes = await fetchIssueTypesForProject(client, project_key);
+        await sendLog(extra, "info", `Found ${issueTypes.length} issue type(s)`);
 
         const output = {
           issue_types: issueTypes.map((it) => ({

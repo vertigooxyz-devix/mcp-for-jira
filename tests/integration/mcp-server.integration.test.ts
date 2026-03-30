@@ -28,7 +28,11 @@ describe("MCP Server Integration", () => {
 
     client = new Client(
       { name: "integration-test-client", version: "1.0.0" },
-      { capabilities: {} }
+      {
+        capabilities: {
+          logging: {},
+        },
+      }
     );
 
     await client.connect(transport);
