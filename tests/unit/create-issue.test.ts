@@ -3,9 +3,17 @@ import { registerCreateIssueTool } from "../../src/tools/create-issue.js";
 import { createdIssueResponse, issueTypesResponse } from "../fixtures/jira-responses.js";
 import type { AxiosInstance } from "axios";
 
+// Mock extra parameter for tool handler
+const createMockExtra = () => ({
+  sendNotification: vi.fn().mockResolvedValue(undefined),
+  signal: new AbortController().signal,
+  requestId: "test-request-id",
+});
+
 describe("jira_create_issue", () => {
   let mockClient: AxiosInstance;
-  let toolHandler: (params: unknown) => Promise<object>;
+  let toolHandler: (params: unknown, extra: ReturnType<typeof createMockExtra>) => Promise<object>;
+  let mockExtra: ReturnType<typeof createMockExtra>;
 
   beforeEach(() => {
     mockClient = {
@@ -13,9 +21,15 @@ describe("jira_create_issue", () => {
       post: vi.fn(),
     } as unknown as AxiosInstance;
 
+    mockExtra = createMockExtra();
+
     const server = {
       registerTool: vi.fn(
-        (_name: string, _config: object, handler: (params: unknown) => Promise<object>) => {
+        (
+          _name: string,
+          _config: object,
+          handler: (params: unknown, extra: ReturnType<typeof createMockExtra>) => Promise<object>
+        ) => {
           toolHandler = handler;
         }
       ),
@@ -28,11 +42,14 @@ describe("jira_create_issue", () => {
     vi.mocked(mockClient.get).mockResolvedValueOnce({ data: issueTypesResponse });
     vi.mocked(mockClient.post).mockResolvedValueOnce({ data: createdIssueResponse });
 
-    const result = await toolHandler!({
-      project_key: "PROJ",
-      summary: "Test bug",
-      issue_type: "Bug",
-    });
+    const result = await toolHandler!(
+      {
+        project_key: "PROJ",
+        summary: "Test bug",
+        issue_type: "Bug",
+      },
+      mockExtra
+    );
 
     expect(mockClient.get).toHaveBeenCalledWith("/issue/createmeta/PROJ/issuetypes");
     expect(mockClient.post).toHaveBeenCalledWith("/issue", {
@@ -46,16 +63,22 @@ describe("jira_create_issue", () => {
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toContain("PROJ-123");
     expect(content[0].text).toContain("Issue Created");
+
+    // Verify logging notifications were sent
+    expect(mockExtra.sendNotification).toHaveBeenCalled();
   });
 
   it("should use issue type ID when numeric", async () => {
     vi.mocked(mockClient.post).mockResolvedValueOnce({ data: createdIssueResponse });
 
-    await toolHandler!({
-      project_key: "PROJ",
-      summary: "Test",
-      issue_type: "10001",
-    });
+    await toolHandler!(
+      {
+        project_key: "PROJ",
+        summary: "Test",
+        issue_type: "10001",
+      },
+      mockExtra
+    );
 
     expect(mockClient.get).not.toHaveBeenCalled();
     expect(mockClient.post).toHaveBeenCalledWith("/issue", {
@@ -71,12 +94,15 @@ describe("jira_create_issue", () => {
     vi.mocked(mockClient.get).mockResolvedValueOnce({ data: issueTypesResponse });
     vi.mocked(mockClient.post).mockResolvedValueOnce({ data: createdIssueResponse });
 
-    await toolHandler!({
-      project_key: "PROJ",
-      summary: "Test",
-      issue_type: "Bug",
-      description: "Detailed description",
-    });
+    await toolHandler!(
+      {
+        project_key: "PROJ",
+        summary: "Test",
+        issue_type: "Bug",
+        description: "Detailed description",
+      },
+      mockExtra
+    );
 
     expect(mockClient.post).toHaveBeenCalledWith("/issue", {
       fields: {
@@ -101,12 +127,15 @@ describe("jira_create_issue", () => {
     vi.mocked(mockClient.get).mockResolvedValueOnce({ data: issueTypesResponse });
     vi.mocked(mockClient.post).mockResolvedValueOnce({ data: createdIssueResponse });
 
-    const result = await toolHandler!({
-      project_key: "PROJ",
-      summary: "Test",
-      issue_type: "Bug",
-      response_format: "json",
-    });
+    const result = await toolHandler!(
+      {
+        project_key: "PROJ",
+        summary: "Test",
+        issue_type: "Bug",
+        response_format: "json",
+      },
+      mockExtra
+    );
 
     const content = (result as { content: { text: string }[] }).content;
     const parsed = JSON.parse(content[0].text);
@@ -126,22 +155,28 @@ describe("jira_create_issue", () => {
     };
     vi.mocked(mockClient.get).mockRejectedValueOnce(axiosError);
 
-    const result = await toolHandler!({
-      project_key: "PROJ",
-      summary: "Test",
-      issue_type: "Bug",
-    });
+    const result = await toolHandler!(
+      {
+        project_key: "PROJ",
+        summary: "Test",
+        issue_type: "Bug",
+      },
+      mockExtra
+    );
 
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toContain("Authentication failed");
   });
 
   it("should reject invalid project_key", async () => {
-    const result = await toolHandler!({
-      project_key: "invalid",
-      summary: "Test",
-      issue_type: "Bug",
-    });
+    const result = await toolHandler!(
+      {
+        project_key: "invalid",
+        summary: "Test",
+        issue_type: "Bug",
+      },
+      mockExtra
+    );
 
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toMatch(/Error|invalid|required/i);
@@ -152,11 +187,14 @@ describe("jira_create_issue", () => {
       data: { values: [{ id: "1", name: "Bug" }] },
     });
 
-    const result = await toolHandler!({
-      project_key: "PROJ",
-      summary: "Test",
-      issue_type: "NonExistentType",
-    });
+    const result = await toolHandler!(
+      {
+        project_key: "PROJ",
+        summary: "Test",
+        issue_type: "NonExistentType",
+      },
+      mockExtra
+    );
 
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toContain("not found");
@@ -168,11 +206,14 @@ describe("jira_create_issue", () => {
       .mockRejectedValueOnce(new Error("Not found"))
       .mockResolvedValueOnce({ data: [] });
 
-    const result = await toolHandler!({
-      project_key: "PROJ",
-      summary: "Test",
-      issue_type: "NonExistentType",
-    });
+    const result = await toolHandler!(
+      {
+        project_key: "PROJ",
+        summary: "Test",
+        issue_type: "NonExistentType",
+      },
+      mockExtra
+    );
 
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toContain("not found");

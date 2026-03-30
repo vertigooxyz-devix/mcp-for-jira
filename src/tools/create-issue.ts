@@ -4,6 +4,29 @@ import type { CreatedIssue } from "../types.js";
 import { CreateIssueInputSchema, ResponseFormat } from "../schemas/issue.js";
 import { handleJiraError } from "../services/jira-client.js";
 import { fetchIssueTypesForProject } from "../services/jira-api.js";
+import type { ServerRequest, ServerNotification } from "@modelcontextprotocol/sdk/types.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+
+type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
+
+/**
+ * Sends a logging message notification to the client.
+ * Silently skips if the client doesn't support logging.
+ */
+async function sendLog(
+  extra: ToolExtra,
+  level: "debug" | "info" | "warning" | "error",
+  message: string
+): Promise<void> {
+  try {
+    await extra.sendNotification({
+      method: "notifications/message",
+      params: { level, data: message },
+    });
+  } catch {
+    // Client may not support logging - silently skip
+  }
+}
 
 async function resolveIssueTypeId(
   client: AxiosInstance,
@@ -57,7 +80,7 @@ export function registerCreateIssueTool(
     registerTool: (
       name: string,
       config: object,
-      handler: (...args: unknown[]) => Promise<object>
+      handler: (args: unknown, extra: ToolExtra) => Promise<object>
     ) => void;
   },
   client: AxiosInstance
@@ -89,12 +112,18 @@ export function registerCreateIssueTool(
         openWorldHint: true,
       },
     },
-    async (args: unknown) => {
+    async (args: unknown, extra: ToolExtra) => {
       try {
         const { project_key, summary, issue_type, description, response_format } =
           CreateIssueInputSchema.parse(args);
 
+        // Log start of operation
+        await sendLog(extra, "info", `Creating issue in project ${project_key}...`);
+
+        // Log issue type resolution
+        await sendLog(extra, "debug", `Resolving issue type "${issue_type}"...`);
         const issueTypeId = await resolveIssueTypeId(client, project_key, issue_type);
+        await sendLog(extra, "debug", `Resolved issue type to ID: ${issueTypeId}`);
 
         const fields: Record<string, unknown> = {
           project: { key: project_key },
@@ -115,9 +144,12 @@ export function registerCreateIssueTool(
           };
         }
 
+        // Log API call
+        await sendLog(extra, "info", "Sending request to Jira API...");
         const response = await client.post<CreatedIssue>("/issue", {
           fields,
         });
+        await sendLog(extra, "info", `Issue ${response.data.key} created successfully`);
 
         const result = {
           key: response.data.key,

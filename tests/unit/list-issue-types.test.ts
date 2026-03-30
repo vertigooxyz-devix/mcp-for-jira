@@ -3,18 +3,32 @@ import { registerListIssueTypesTool } from "../../src/tools/list-issue-types.js"
 import { issueTypesResponse } from "../fixtures/jira-responses.js";
 import type { AxiosInstance } from "axios";
 
+// Mock extra parameter for tool handler
+const createMockExtra = () => ({
+  sendNotification: vi.fn().mockResolvedValue(undefined),
+  signal: new AbortController().signal,
+  requestId: "test-request-id",
+});
+
 describe("jira_list_issue_types", () => {
   let mockClient: AxiosInstance;
-  let toolHandler: (params: unknown) => Promise<object>;
+  let toolHandler: (params: unknown, extra: ReturnType<typeof createMockExtra>) => Promise<object>;
+  let mockExtra: ReturnType<typeof createMockExtra>;
 
   beforeEach(() => {
     mockClient = {
       get: vi.fn().mockResolvedValue({ data: issueTypesResponse }),
     } as unknown as AxiosInstance;
 
+    mockExtra = createMockExtra();
+
     const server = {
       registerTool: vi.fn(
-        (_name: string, _config: object, handler: (params: unknown) => Promise<object>) => {
+        (
+          _name: string,
+          _config: object,
+          handler: (params: unknown, extra: ReturnType<typeof createMockExtra>) => Promise<object>
+        ) => {
           toolHandler = handler;
         }
       ),
@@ -24,7 +38,7 @@ describe("jira_list_issue_types", () => {
   });
 
   it("should list issue types for project", async () => {
-    const result = await toolHandler!({ project_key: "PROJ" });
+    const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
     expect(mockClient.get).toHaveBeenCalledWith("/issue/createmeta/PROJ/issuetypes");
 
@@ -33,13 +47,19 @@ describe("jira_list_issue_types", () => {
     expect(content[0].text).toContain("Task");
     expect(content[0].text).toContain("Story");
     expect(content[0].text).toContain("Issue Types for PROJ");
+
+    // Verify logging notifications were sent
+    expect(mockExtra.sendNotification).toHaveBeenCalled();
   });
 
   it("should return JSON format when requested", async () => {
-    const result = await toolHandler!({
-      project_key: "PROJ",
-      response_format: "json",
-    });
+    const result = await toolHandler!(
+      {
+        project_key: "PROJ",
+        response_format: "json",
+      },
+      mockExtra
+    );
 
     const content = (result as { content: { text: string }[] }).content;
     const parsed = JSON.parse(content[0].text);
@@ -48,7 +68,7 @@ describe("jira_list_issue_types", () => {
   });
 
   it("should include structuredContent", async () => {
-    const result = await toolHandler!({ project_key: "PROJ" });
+    const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
     const structured = (result as { structuredContent?: { issue_types: unknown[] } })
       .structuredContent;
@@ -59,7 +79,7 @@ describe("jira_list_issue_types", () => {
   it("should handle empty issue types", async () => {
     vi.mocked(mockClient.get).mockResolvedValueOnce({ data: { values: [] } });
 
-    const result = await toolHandler!({ project_key: "PROJ" });
+    const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toContain("Issue Types for PROJ");
@@ -72,7 +92,7 @@ describe("jira_list_issue_types", () => {
         data: [{ id: "1", name: "Task" }],
       });
 
-    const result = await toolHandler!({ project_key: "PROJ" });
+    const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toContain("Task");
@@ -85,7 +105,7 @@ describe("jira_list_issue_types", () => {
         data: [{ id: "10001", name: "Epic", description: "An epic" }],
       });
 
-    const result = await toolHandler!({ project_key: "PROJ" });
+    const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
     expect(mockClient.get).toHaveBeenCalledTimes(2);
     expect(mockClient.get).toHaveBeenNthCalledWith(1, "/issue/createmeta/PROJ/issuetypes");
@@ -103,7 +123,7 @@ describe("jira_list_issue_types", () => {
         data: [{ id: "10001", name: "Task", description: "A task" }],
       });
 
-    const result = await toolHandler!({ project_key: "PROJ" });
+    const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
     expect(mockClient.get).toHaveBeenCalledTimes(3);
     const content = (result as { content: { text: string }[] }).content;
@@ -118,7 +138,7 @@ describe("jira_list_issue_types", () => {
         data: [{ id: "10001", name: "Task", description: "A task" }],
       });
 
-    const result = await toolHandler!({ project_key: "PROJ" });
+    const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
     expect(mockClient.get).toHaveBeenCalledTimes(3);
     expect(mockClient.get).toHaveBeenNthCalledWith(1, "/issue/createmeta/PROJ/issuetypes");
@@ -139,7 +159,7 @@ describe("jira_list_issue_types", () => {
       },
     });
 
-    const result = await toolHandler!({ project_key: "PROJ" });
+    const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toContain("## Bug");
@@ -153,14 +173,14 @@ describe("jira_list_issue_types", () => {
       Object.assign(new Error("Forbidden"), { response: { status: 403 } })
     );
 
-    const result = await toolHandler!({ project_key: "PROJ" });
+    const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toContain("Error");
   });
 
   it("should reject invalid project_key", async () => {
-    const result = await toolHandler!({ project_key: "invalid-key" });
+    const result = await toolHandler!({ project_key: "invalid-key" }, mockExtra);
 
     const content = (result as { content: { text: string }[] }).content;
     expect(content[0].text).toMatch(/Error|invalid|required/i);
