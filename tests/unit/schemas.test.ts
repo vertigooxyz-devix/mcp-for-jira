@@ -238,9 +238,7 @@ describe("CreatemetaIssueTypesResponseSchema", () => {
   });
 
   it("should reject a response where values is not an array", () => {
-    expect(() =>
-      CreatemetaIssueTypesResponseSchema.parse({ values: "not-an-array" })
-    ).toThrow();
+    expect(() => CreatemetaIssueTypesResponseSchema.parse({ values: "not-an-array" })).toThrow();
   });
 
   it("should reject a response where a value item is malformed", () => {
