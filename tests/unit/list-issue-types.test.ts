@@ -77,7 +77,10 @@ describe("jira_list_issue_types", () => {
   });
 
   it("should handle empty issue types", async () => {
-    vi.mocked(mockClient.get).mockResolvedValueOnce({ data: { values: [] } });
+    vi.mocked(mockClient.get)
+      .mockResolvedValueOnce({ data: { values: [] } }) // createmeta → empty
+      .mockResolvedValueOnce({ data: [] }) // /issuetype/project → empty array
+      .mockResolvedValueOnce({ data: [] }); // /issuetype global → empty array
 
     const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);
 
@@ -87,9 +90,9 @@ describe("jira_list_issue_types", () => {
 
   it("should handle createmeta with missing values key", async () => {
     vi.mocked(mockClient.get)
-      .mockResolvedValueOnce({ data: {} })
+      .mockResolvedValueOnce({ data: {} }) // createmeta → no values key (defaults to [])
       .mockResolvedValueOnce({
-        data: [{ id: "1", name: "Task" }],
+        data: [{ id: "1", name: "Task" }], // /issuetype/project → valid array
       });
 
     const result = await toolHandler!({ project_key: "PROJ" }, mockExtra);

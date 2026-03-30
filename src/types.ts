@@ -1,17 +1,13 @@
-export interface CreatedIssue {
-  id: string;
-  key: string;
-  self: string;
-}
-
-export interface JiraIssueType {
-  id: string;
-  name: string;
-  description?: string;
-  self?: string;
-  iconUrl?: string;
-}
-
-export interface IssueTypesResponse {
-  values: JiraIssueType[];
-}
+/**
+ * Public TypeScript types for Jira API response shapes.
+ *
+ * These types are derived directly from the Zod response schemas in
+ * `src/schemas/jira-responses.ts` so that the runtime-validated schema and
+ * the static TypeScript type are always in sync — there is a single source of
+ * truth.
+ */
+export type {
+  JiraIssueType,
+  CreatedIssueResponse as CreatedIssue,
+  CreatemetaIssueTypesResponse as IssueTypesResponse,
+} from "./schemas/jira-responses.js";
