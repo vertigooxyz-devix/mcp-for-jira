@@ -47,11 +47,14 @@ describe("MCP Server Integration", () => {
     const result = await client.listTools();
 
     expect(result.tools).toBeDefined();
-    expect(result.tools.length).toBeGreaterThanOrEqual(2);
+    expect(result.tools.length).toBeGreaterThanOrEqual(5);
 
     const toolNames = result.tools.map((t) => t.name);
     expect(toolNames).toContain("jira_list_issue_types");
     expect(toolNames).toContain("jira_create_issue");
+    expect(toolNames).toContain("jira_delete_issue");
+    expect(toolNames).toContain("jira_edit_issue");
+    expect(toolNames).toContain("jira_change_status");
   });
 
   it("should call jira_list_issue_types and return issue types", async () => {
@@ -120,5 +123,105 @@ describe("MCP Server Integration", () => {
     expect(parsed.key).toBe("PROJ-123");
     expect(parsed.id).toBe("10000");
     expect(parsed.self).toContain("/issue/10000");
+  });
+
+  // -------------------------------------------------------------------------
+  // DELETE_TASK
+  // -------------------------------------------------------------------------
+
+  it("should call jira_delete_issue and return confirmation", async () => {
+    const result = await client.callTool({
+      name: "jira_delete_issue",
+      arguments: { issue_key: "PROJ-123" },
+    });
+
+    expect(result.content).toBeDefined();
+    const textContent = result.content!.find((c) => c.type === "text");
+    expect(textContent).toBeDefined();
+    expect((textContent as { text: string }).text).toContain("Issue Deleted");
+    expect((textContent as { text: string }).text).toContain("PROJ-123");
+  });
+
+  it("should call jira_delete_issue with JSON format", async () => {
+    const result = await client.callTool({
+      name: "jira_delete_issue",
+      arguments: { issue_key: "PROJ-123", response_format: "json" },
+    });
+
+    const textContent = result.content!.find((c) => c.type === "text");
+    const parsed = JSON.parse((textContent as { text: string }).text);
+    expect(parsed.deleted).toBe(true);
+    expect(parsed.issue_key).toBe("PROJ-123");
+  });
+
+  // -------------------------------------------------------------------------
+  // EDIT_TASK
+  // -------------------------------------------------------------------------
+
+  it("should call jira_edit_issue and return updated issue", async () => {
+    const result = await client.callTool({
+      name: "jira_edit_issue",
+      arguments: {
+        issue_key: "PROJ-123",
+        summary: "Integration test update",
+      },
+    });
+
+    expect(result.content).toBeDefined();
+    const textContent = result.content!.find((c) => c.type === "text");
+    expect((textContent as { text: string }).text).toContain("Issue Updated");
+    expect((textContent as { text: string }).text).toContain("summary");
+  });
+
+  it("should call jira_edit_issue with JSON format", async () => {
+    const result = await client.callTool({
+      name: "jira_edit_issue",
+      arguments: {
+        issue_key: "PROJ-123",
+        summary: "JSON edit test",
+        response_format: "json",
+      },
+    });
+
+    const textContent = result.content!.find((c) => c.type === "text");
+    const parsed = JSON.parse((textContent as { text: string }).text);
+    expect(parsed.key).toBe("PROJ-123");
+    expect(parsed.updated_fields).toContain("summary");
+  });
+
+  // -------------------------------------------------------------------------
+  // CHANGE_STATUS
+  // -------------------------------------------------------------------------
+
+  it("should call jira_change_status and return transition confirmation", async () => {
+    const result = await client.callTool({
+      name: "jira_change_status",
+      arguments: {
+        issue_key: "PROJ-123",
+        transition_name: "Done",
+      },
+    });
+
+    expect(result.content).toBeDefined();
+    const textContent = result.content!.find((c) => c.type === "text");
+    expect((textContent as { text: string }).text).toContain("Status Changed");
+    expect((textContent as { text: string }).text).toContain("Done");
+  });
+
+  it("should call jira_change_status with JSON format", async () => {
+    const result = await client.callTool({
+      name: "jira_change_status",
+      arguments: {
+        issue_key: "PROJ-123",
+        transition_name: "In Progress",
+        response_format: "json",
+      },
+    });
+
+    const textContent = result.content!.find((c) => c.type === "text");
+    const parsed = JSON.parse((textContent as { text: string }).text);
+    expect(parsed.issue_key).toBe("PROJ-123");
+    expect(parsed.transition_name).toBe("In Progress");
+    expect(parsed.target_status).toBe("In Progress");
   });
 });
