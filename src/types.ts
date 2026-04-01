@@ -10,4 +10,7 @@ export type {
   JiraIssueType,
   CreatedIssueResponse as CreatedIssue,
   CreatemetaIssueTypesResponse as IssueTypesResponse,
+  JiraTransition,
+  JiraTransitionsResponse,
+  IssueDetailsResponse,
 } from "./schemas/jira-responses.js";

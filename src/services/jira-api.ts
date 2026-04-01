@@ -2,7 +2,9 @@ import type { AxiosInstance } from "axios";
 import {
   CreatemetaIssueTypesResponseSchema,
   IssueTypeListResponseSchema,
+  JiraTransitionsResponseSchema,
   type JiraIssueType,
+  type JiraTransition,
 } from "../schemas/jira-responses.js";
 
 export async function fetchIssueTypesForProject(
@@ -31,4 +33,27 @@ export async function fetchIssueTypesForProject(
   // FALLBACK 2: GET /rest/api/3/issuetype
   const globalRes = await client.get(`/issuetype`);
   return IssueTypeListResponseSchema.parse(globalRes.data);
+}
+
+// ---------------------------------------------------------------------------
+// GET /rest/api/3/issue/{issueIdOrKey}/transitions
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetches all workflow transitions currently available for an issue.
+ *
+ * Jira only returns transitions that are valid from the issue's *current*
+ * status, so the list is context-sensitive.  The response is validated
+ * against `JiraTransitionsResponseSchema` and the inner `transitions` array
+ * is returned directly.
+ */
+export async function fetchTransitionsForIssue(
+  client: AxiosInstance,
+  issueKey: string
+): Promise<JiraTransition[]> {
+  const res = await client.get(
+    `/issue/${encodeURIComponent(issueKey)}/transitions`
+  );
+  const parsed = JiraTransitionsResponseSchema.parse(res.data);
+  return parsed.transitions;
 }

@@ -1,10 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { CreateIssueInputSchema, ListIssueTypesInputSchema } from "../../src/schemas/issue.js";
+import {
+  CreateIssueInputSchema,
+  ListIssueTypesInputSchema,
+  DeleteIssueInputSchema,
+  EditIssueInputSchema,
+  ChangeStatusInputSchema,
+} from "../../src/schemas/issue.js";
 import {
   JiraIssueTypeSchema,
   CreatemetaIssueTypesResponseSchema,
   IssueTypeListResponseSchema,
   CreatedIssueResponseSchema,
+  JiraTransitionSchema,
+  JiraTransitionsResponseSchema,
+  IssueDetailsResponseSchema,
 } from "../../src/schemas/jira-responses.js";
 
 // ---------------------------------------------------------------------------
@@ -365,6 +374,348 @@ describe("CreatedIssueResponseSchema", () => {
         key: "PROJ-1",
         self: "https://example.atlassian.net/rest/api/3/issue/1",
       })
+    ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DeleteIssueInputSchema
+// ---------------------------------------------------------------------------
+
+describe("DeleteIssueInputSchema", () => {
+  it("should accept a minimal valid input", () => {
+    const result = DeleteIssueInputSchema.parse({ issue_key: "PROJ-123" });
+    expect(result.issue_key).toBe("PROJ-123");
+    expect(result.delete_subtasks).toBe(false);
+    expect(result.response_format).toBe("markdown");
+  });
+
+  it("should accept delete_subtasks: true", () => {
+    const result = DeleteIssueInputSchema.parse({
+      issue_key: "PROJ-123",
+      delete_subtasks: true,
+    });
+    expect(result.delete_subtasks).toBe(true);
+  });
+
+  it("should accept a numeric issue ID string", () => {
+    const result = DeleteIssueInputSchema.parse({ issue_key: "10042" });
+    expect(result.issue_key).toBe("10042");
+  });
+
+  it("should accept response_format json", () => {
+    const result = DeleteIssueInputSchema.parse({
+      issue_key: "PROJ-1",
+      response_format: "json",
+    });
+    expect(result.response_format).toBe("json");
+  });
+
+  it("should reject empty issue_key", () => {
+    expect(() => DeleteIssueInputSchema.parse({ issue_key: "" })).toThrow();
+  });
+
+  it("should reject extra fields (strict mode)", () => {
+    expect(() =>
+      DeleteIssueInputSchema.parse({ issue_key: "PROJ-1", unexpected: "field" })
+    ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EditIssueInputSchema
+// ---------------------------------------------------------------------------
+
+describe("EditIssueInputSchema", () => {
+  it("should accept input with only summary changed", () => {
+    const result = EditIssueInputSchema.parse({
+      issue_key: "PROJ-123",
+      summary: "New title",
+    });
+    expect(result.summary).toBe("New title");
+    expect(result.description).toBeUndefined();
+    expect(result.issue_type).toBeUndefined();
+  });
+
+  it("should accept input with only description changed", () => {
+    const result = EditIssueInputSchema.parse({
+      issue_key: "PROJ-123",
+      description: "Updated description",
+    });
+    expect(result.description).toBe("Updated description");
+  });
+
+  it("should accept input with only issue_type changed", () => {
+    const result = EditIssueInputSchema.parse({
+      issue_key: "PROJ-123",
+      issue_type: "Task",
+    });
+    expect(result.issue_type).toBe("Task");
+  });
+
+  it("should accept all three fields simultaneously", () => {
+    const result = EditIssueInputSchema.parse({
+      issue_key: "PROJ-123",
+      summary: "Title",
+      description: "Desc",
+      issue_type: "Bug",
+    });
+    expect(result.summary).toBe("Title");
+    expect(result.description).toBe("Desc");
+    expect(result.issue_type).toBe("Bug");
+  });
+
+  it("should accept numeric issue_type ID", () => {
+    const result = EditIssueInputSchema.parse({
+      issue_key: "PROJ-123",
+      issue_type: "10001",
+    });
+    expect(result.issue_type).toBe("10001");
+  });
+
+  it("should default response_format to markdown", () => {
+    const result = EditIssueInputSchema.parse({
+      issue_key: "PROJ-1",
+      summary: "x",
+    });
+    expect(result.response_format).toBe("markdown");
+  });
+
+  it("should reject when no mutable field is provided", () => {
+    expect(() =>
+      EditIssueInputSchema.parse({ issue_key: "PROJ-123" })
+    ).toThrow();
+  });
+
+  it("should reject empty issue_key", () => {
+    expect(() =>
+      EditIssueInputSchema.parse({ issue_key: "", summary: "x" })
+    ).toThrow();
+  });
+
+  it("should reject summary exceeding 255 characters", () => {
+    expect(() =>
+      EditIssueInputSchema.parse({
+        issue_key: "PROJ-1",
+        summary: "x".repeat(256),
+      })
+    ).toThrow();
+  });
+
+  it("should reject extra fields (strict mode)", () => {
+    expect(() =>
+      EditIssueInputSchema.parse({
+        issue_key: "PROJ-1",
+        summary: "x",
+        notAllowed: true,
+      })
+    ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ChangeStatusInputSchema
+// ---------------------------------------------------------------------------
+
+describe("ChangeStatusInputSchema", () => {
+  it("should accept a valid input", () => {
+    const result = ChangeStatusInputSchema.parse({
+      issue_key: "PROJ-123",
+      transition_name: "In Progress",
+    });
+    expect(result.issue_key).toBe("PROJ-123");
+    expect(result.transition_name).toBe("In Progress");
+    expect(result.response_format).toBe("markdown");
+  });
+
+  it("should accept a numeric transition ID as transition_name", () => {
+    const result = ChangeStatusInputSchema.parse({
+      issue_key: "PROJ-123",
+      transition_name: "31",
+    });
+    expect(result.transition_name).toBe("31");
+  });
+
+  it("should accept response_format json", () => {
+    const result = ChangeStatusInputSchema.parse({
+      issue_key: "PROJ-1",
+      transition_name: "Done",
+      response_format: "json",
+    });
+    expect(result.response_format).toBe("json");
+  });
+
+  it("should reject empty issue_key", () => {
+    expect(() =>
+      ChangeStatusInputSchema.parse({ issue_key: "", transition_name: "Done" })
+    ).toThrow();
+  });
+
+  it("should reject empty transition_name", () => {
+    expect(() =>
+      ChangeStatusInputSchema.parse({ issue_key: "PROJ-1", transition_name: "" })
+    ).toThrow();
+  });
+
+  it("should reject extra fields (strict mode)", () => {
+    expect(() =>
+      ChangeStatusInputSchema.parse({
+        issue_key: "PROJ-1",
+        transition_name: "Done",
+        extra: "field",
+      })
+    ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// JiraTransitionSchema
+// ---------------------------------------------------------------------------
+
+describe("JiraTransitionSchema", () => {
+  it("should accept a minimal transition with only required fields", () => {
+    const result = JiraTransitionSchema.parse({ id: "21", name: "In Progress" });
+    expect(result.id).toBe("21");
+    expect(result.name).toBe("In Progress");
+    expect(result.to).toBeUndefined();
+  });
+
+  it("should accept a full transition with to.statusCategory", () => {
+    const input = {
+      id: "31",
+      name: "Done",
+      to: {
+        id: "10002",
+        name: "Done",
+        statusCategory: { id: 3, key: "done", name: "Done" },
+      },
+    };
+    const result = JiraTransitionSchema.parse(input);
+    expect(result.to?.name).toBe("Done");
+    expect(result.to?.statusCategory?.key).toBe("done");
+  });
+
+  it("should accept unknown extra fields without throwing", () => {
+    expect(() =>
+      JiraTransitionSchema.parse({ id: "1", name: "Foo", unknownField: true })
+    ).not.toThrow();
+  });
+
+  it("should reject a missing id", () => {
+    expect(() => JiraTransitionSchema.parse({ name: "Done" })).toThrow();
+  });
+
+  it("should reject a missing name", () => {
+    expect(() => JiraTransitionSchema.parse({ id: "31" })).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// JiraTransitionsResponseSchema
+// ---------------------------------------------------------------------------
+
+describe("JiraTransitionsResponseSchema", () => {
+  it("should accept an empty transitions array", () => {
+    const result = JiraTransitionsResponseSchema.parse({ transitions: [] });
+    expect(result.transitions).toHaveLength(0);
+  });
+
+  it("should accept a populated transitions array", () => {
+    const result = JiraTransitionsResponseSchema.parse({
+      transitions: [
+        { id: "11", name: "To Do" },
+        { id: "21", name: "In Progress" },
+        { id: "31", name: "Done" },
+      ],
+    });
+    expect(result.transitions).toHaveLength(3);
+    expect(result.transitions[2].name).toBe("Done");
+  });
+
+  it("should default transitions to empty array when key is absent", () => {
+    const result = JiraTransitionsResponseSchema.parse({});
+    expect(result.transitions).toEqual([]);
+  });
+
+  it("should reject when transitions is not an array", () => {
+    expect(() =>
+      JiraTransitionsResponseSchema.parse({ transitions: "invalid" })
+    ).toThrow();
+  });
+
+  it("should reject a malformed transition item", () => {
+    expect(() =>
+      JiraTransitionsResponseSchema.parse({
+        transitions: [{ name: "Done" }], // missing id
+      })
+    ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// IssueDetailsResponseSchema
+// ---------------------------------------------------------------------------
+
+describe("IssueDetailsResponseSchema", () => {
+  it("should accept a minimal valid response", () => {
+    const input = {
+      id: "10000",
+      key: "PROJ-123",
+      self: "https://example.atlassian.net/rest/api/3/issue/10000",
+    };
+    const result = IssueDetailsResponseSchema.parse(input);
+    expect(result.key).toBe("PROJ-123");
+    expect(result.fields).toBeUndefined();
+  });
+
+  it("should accept a full response with fields", () => {
+    const input = {
+      id: "10000",
+      key: "PROJ-123",
+      self: "https://example.atlassian.net/rest/api/3/issue/10000",
+      fields: {
+        summary: "Test issue",
+        status: { id: "10001", name: "In Progress" },
+        issuetype: { id: "10001", name: "Bug" },
+      },
+    };
+    const result = IssueDetailsResponseSchema.parse(input);
+    expect(result.fields?.summary).toBe("Test issue");
+    expect(result.fields?.status?.name).toBe("In Progress");
+  });
+
+  it("should accept unknown extra fields at the top level without throwing", () => {
+    expect(() =>
+      IssueDetailsResponseSchema.parse({
+        id: "1",
+        key: "X-1",
+        self: "https://example.atlassian.net/rest/api/3/issue/1",
+        expand: "renderedFields",
+      })
+    ).not.toThrow();
+  });
+
+  it("should reject a missing id", () => {
+    expect(() =>
+      IssueDetailsResponseSchema.parse({
+        key: "PROJ-1",
+        self: "https://example.atlassian.net/rest/api/3/issue/1",
+      })
+    ).toThrow();
+  });
+
+  it("should reject a missing key", () => {
+    expect(() =>
+      IssueDetailsResponseSchema.parse({
+        id: "1",
+        self: "https://example.atlassian.net/rest/api/3/issue/1",
+      })
+    ).toThrow();
+  });
+
+  it("should reject an invalid self URL", () => {
+    expect(() =>
+      IssueDetailsResponseSchema.parse({ id: "1", key: "X-1", self: "not-a-url" })
     ).toThrow();
   });
 });

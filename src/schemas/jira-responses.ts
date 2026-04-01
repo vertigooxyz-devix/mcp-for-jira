@@ -101,3 +101,85 @@ export const CreatedIssueResponseSchema = z.object({
 });
 
 export type CreatedIssueResponse = z.infer<typeof CreatedIssueResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// GET /rest/api/3/issue/{issueIdOrKey}/transitions
+// ---------------------------------------------------------------------------
+
+/**
+ * A single workflow transition available for an issue.
+ *
+ * Documented fields:
+ *   id   – numeric string identifier used when posting the transition
+ *   name – human-readable name shown in the Jira UI (e.g. "In Progress")
+ *   to   – the target status object after the transition is applied
+ */
+export const JiraTransitionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  to: z
+    .object({
+      id: z.string().optional(),
+      name: z.string().optional(),
+      statusCategory: z
+        .object({
+          id: z.number().optional(),
+          key: z.string().optional(),
+          name: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+export type JiraTransition = z.infer<typeof JiraTransitionSchema>;
+
+/**
+ * Response envelope from GET /rest/api/3/issue/{issueIdOrKey}/transitions.
+ * `transitions` defaults to an empty array when the key is absent.
+ */
+export const JiraTransitionsResponseSchema = z.object({
+  transitions: z.array(JiraTransitionSchema).optional().default([]),
+});
+
+export type JiraTransitionsResponse = z.infer<typeof JiraTransitionsResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// GET /rest/api/3/issue/{issueIdOrKey}  (fields subset used by edit tool)
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal representation of an existing Jira issue returned by the issue
+ * endpoint.  Only the fields that the edit and change-status tools need are
+ * modelled here; extra fields from Jira are silently stripped (no `.strict()`).
+ *
+ * Documented fields:
+ *   id     – internal numeric string identifier
+ *   key    – project-scoped key (e.g. "PROJ-123")
+ *   self   – canonical REST URL for this resource
+ *   fields – nested object containing the mutable fields
+ */
+export const IssueDetailsResponseSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  self: z.string().url(),
+  fields: z
+    .object({
+      summary: z.string().optional(),
+      status: z
+        .object({
+          id: z.string().optional(),
+          name: z.string().optional(),
+        })
+        .optional(),
+      issuetype: z
+        .object({
+          id: z.string().optional(),
+          name: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+export type IssueDetailsResponse = z.infer<typeof IssueDetailsResponseSchema>;
